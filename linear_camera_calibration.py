@@ -1,5 +1,5 @@
 """
-This code is an implementation of Exercise 1.14 from the book "Computer Vision: A Modern Approach" by Forsyth & Ponce.
+This code is an implementation of Exercise 1.13 from the book "Computer Vision: A Modern Approach" by Forsyth & Ponce.
 """
 
 import numpy as np
