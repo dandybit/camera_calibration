@@ -123,6 +123,7 @@ def build_P_matrix(points_2D, points_3D):
 
     return P
 
+
 def create_skew_rotation_matrix(vector):
     return np.array([
         [0, -vector[2], vector[1]],
@@ -130,7 +131,7 @@ def create_skew_rotation_matrix(vector):
         [-vector[1], vector[0], 0],
     ])
 
-"""
+
 def compute_jacobian(points_2D_y, points_3D, params):
     # number of points (rows)
     N = points_3D.shape[0]
@@ -194,7 +195,7 @@ def compute_jacobian(points_2D_y, points_3D, params):
     # d_u/d_coe_r_1
     J[::2, 5] = ((((params['alpha'] * norm_points[:, 0]) * (polinomial_lambda_distortion(1, 0, 0)(d_2))))
                  + ((norm_points[:, 1] * (
-                        np.cos(params['theta']) / np.sin(params['theta'])))) * polinomial_lambda_distortion(1, 0, 0)(
+                    np.cos(params['theta']) / np.sin(params['theta'])))) * polinomial_lambda_distortion(1, 0, 0)(
                 d_2))
     # d_v/d_coe_r_1
     J[1::2, 5] = (params['beta'] * norm_points[:, 1] * (polinomial_lambda_distortion(1, 0, 0)(d_2))
@@ -203,7 +204,7 @@ def compute_jacobian(points_2D_y, points_3D, params):
     # d_u/d_coe_r_2
     J[::2, 6] = ((((params['alpha'] * norm_points[:, 0]) * (polinomial_lambda_distortion(0, 1, 0)(d_2))))
                  + ((norm_points[:, 1] * (
-                        np.cos(params['theta']) / np.sin(params['theta'])))) * polinomial_lambda_distortion(0, 1, 0)(
+                    np.cos(params['theta']) / np.sin(params['theta'])))) * polinomial_lambda_distortion(0, 1, 0)(
                 d_2))
     # d_v/d_coe_r_2
     J[1::2, 6] = (norm_points[:, 1] * params['beta'] * (polinomial_lambda_distortion(0, 1, 0)(d_2))
@@ -212,12 +213,11 @@ def compute_jacobian(points_2D_y, points_3D, params):
     # d_u/d_coe_r_3
     J[::2, 7] = ((((params['alpha'] * norm_points[:, 0]) * (polinomial_lambda_distortion(0, 0, 1)(d_2))))
                  + ((norm_points[:, 1] * (
-                        np.cos(params['theta']) / np.sin(params['theta'])))) * polinomial_lambda_distortion(0, 0, 1)(
+                    np.cos(params['theta']) / np.sin(params['theta'])))) * polinomial_lambda_distortion(0, 0, 1)(
                 d_2))
     # d_v/d_coe_r_3
     J[1::2, 7] = (norm_points[:, 1] * params['beta'] * (polinomial_lambda_distortion(0, 0, 1)(d_2))
                   * (1 / np.sin(params['theta'])))
-
 
     # the translation vector is based in u = X/Z and v = Y/Z
 
@@ -230,8 +230,8 @@ def compute_jacobian(points_2D_y, points_3D, params):
     # du/dt3  alpha * radial * ((RX1 + t1) / (RX3 + t3)) + beta * ((RX2 + t2) / (RX3 + t3)) * skew + cx
     # -> -X_CAM[:, 0] / Z_CAM^2
     J[::2, 13] = ((params['alpha'] * radial_lambda * (-X_CAM[:, 0]) / (X_CAM[:, -1] ** 2))
-                 + (params['beta'] * radial_lambda * ((np.cos(params['theta']) / np.sin(params['theta'])))
-                    * (-X_CAM[:, 1]) / (X_CAM[:, -1] ** 2)))
+                  + (params['beta'] * radial_lambda * ((np.cos(params['theta']) / np.sin(params['theta'])))
+                     * (-X_CAM[:, 1]) / (X_CAM[:, -1] ** 2)))
 
     # dv/dt1  beta * ((RX2 + t2) / (RX3 + t3)) * skew + cy
     # -> 0
@@ -241,7 +241,8 @@ def compute_jacobian(points_2D_y, points_3D, params):
     J[1::2, 12] = (params['beta'] * radial_lambda * (1 / np.sin(params['theta']))) / X_CAM[:, -1]
     # dv/dt3  beta * ((RX2 + t2) / (RX3 + t3)) * skew + cy
     # -> -X_CAM[:, 0] / Z_CAM^2
-    J[1::2, 13] = ((params['beta'] * radial_lambda * (1 / np.sin(params['theta']))) * (-X_CAM[:, 1]) / (X_CAM[:, -1] ** 2))
+    J[1::2, 13] = (
+                (params['beta'] * radial_lambda * (1 / np.sin(params['theta']))) * (-X_CAM[:, 1]) / (X_CAM[:, -1] ** 2))
 
     # the rotation vector is based in u = X/Z and v = Y/Z
 
@@ -253,80 +254,119 @@ def compute_jacobian(points_2D_y, points_3D, params):
     sin_theta = np.sin(theta)
     cos_theta = np.cos(theta)
 
-    # R = I + sin(theta) * [k]x + (1 - cos(theta)) * ([k]x)²
-    # [k]x = r / theta
-
     # [0, -k_z, k_y]
     # [k_z, 0, -k_x]
     # [-k_y, k_x, 0]
 
+    # R = I + sin(theta) * [k]x + (1 - cos(theta)) * ([k]x)²
+    # [k]x = r / theta
     # theta -> sqrt(r1² + r2² + r3²)
     # dtheta/dr = r1 / theta
     # dsin_theta/dr = (r1 / theta) * cos(theta)
     # dcos_theta/dr = (r1 / theta) * -sin(theta)
-    # dk/dr = (theta - r1**2 * (r1² + r2² + r3³)**(-1/2)) / theta**2
+    # dk_dr1 = (1/theta) * ([1,0,0] - r1*r / theta**2)
 
     # using product rule derivation in Rodrigues
     # sin(theta) * dk/dr + dsin_theta/dr * [k]x +
-    # (1 - cos(theta)) * (dk/dr @ [K]x + [K]x @ dk/dr) + dcos_theta/dr * ([k]x)²
+    # (1 - cos(theta)) * (dk/dr @ [K]x + [K]x @ dk/dr) + (-dcos_theta/dr) * ([k]x)²
 
-    # du/dR1 -> alpha * radial * ((RX1 + t) / (RX3 + t)) + beta * radial * skew * ((RX2 + t) / (RX3 + t)) + cx
+    # du/dR1 -> alpha * radial * ((RX1 + t) / (Rx3 + t)) + beta * radial * skew * ((RX2 + t) / (RX3 + t)) + cx
 
-    # dR/dR1
-    dtheta_dr1 = np.array([r_v_x[0], 0, 0]) / theta
-    # dsin_theta/dr1
-    dsin_dr1 = dtheta_dr1 * cos_theta
-    # dcos_theta/dr1
-    dcos_dr1 = dtheta_dr1 * -sin_theta
-    # d[k]x/dr1
-    dk_dr1 = ((np.array([1, 0, 0]) * theta) - ((np.array([r_v_x[0], 0, 0])**2) * (1/theta))) / theta**2
-    # dR/dR1
-    dR_dR1 = sin_theta * dk_dr1 + dsin_dr1 * (r_v_x / theta) + \
-             ((1 - cos_theta) * (dk_dr1 @ (r_v_x / theta) + (r_v_x / theta) @ dk_dr1)) + \
-             dcos_dr1 * ((r_v_x / theta) @ (r_v_x / theta))
+    k_x = r_v_x / theta
+    k_x = create_skew_rotation_matrix(k_x)
 
-    # dR/dR2
-    dtheta_dr2 = np.array([0, r_v_x[1], 0]) / theta
-    # dsin_theta/dr2
-    dsin_dr2 = dtheta_dr2 * cos_theta
-    # dcos_theta/dr2
-    dcos_dr2 = dtheta_dr2 * -sin_theta
-    # d[k]x/dr2
-    dk_dr2 = ((np.array([0, 1, 0]) * theta) - ((np.array([0, r_v_x[1], 0]) ** 2) * (1 / theta))) / theta ** 2
-    # dR/dR2
-    dR_dR2 = sin_theta * dk_dr2 + dsin_dr2 * (r_v_x / theta) + \
-             ((1 - cos_theta) * (dk_dr2 @ (r_v_x / theta) + (r_v_x / theta) @ dk_dr2)) + \
-             dcos_dr2 * ((r_v_x / theta) @ (r_v_x / theta))
+    # r1
+    dtheta_dr1 = r_v_x[0] / theta
+    dk_dr1 = (1 / theta) * (np.array([1, 0, 0]) - ((r_v_x * r_v_x[0]) / theta ** 2))
+    dk_dr1 = create_skew_rotation_matrix(dk_dr1)
+    dsin_dr1 = cos_theta * dtheta_dr1
+    dcos_dr1 = -sin_theta * dtheta_dr1
 
-    # dR/dR3
-    dtheta_dr3 = np.array([0, 0, r_v_x[2]]) / theta
-    # dsin_theta/dr3
-    dsin_dr3 = dtheta_dr3 * cos_theta
-    # dcos_theta/dr3
-    dcos_dr3 = dtheta_dr3 * -sin_theta
-    # d[k]x/dr3
-    dk_dr3 = ((np.array([0, 0, 1]) * theta) - ((np.array([0, 0, r_v_x[2]]) ** 2) * (1 / theta))) / theta ** 2
-    # dR/dR3
-    dR_dR3 = sin_theta * dk_dr3 + dsin_dr3 * (r_v_x / theta) + \
-             ((1 - cos_theta) * (dk_dr3 @ (r_v_x / theta) + (r_v_x / theta) @ dk_dr3)) + \
-             dcos_dr3 * ((r_v_x / theta) @ (r_v_x / theta))
+    # dk_r1 k**2 -> k @ k -> product rule -> dk_r1 @ k + k @ dk_r1
+    dR_dr1 = ((sin_theta * dk_dr1 + dsin_dr1 * k_x) + ((1 - cos_theta) * (dk_dr1 @ k_x + k_x @ dk_dr1))
+              + ((-dcos_dr1) * k_x @ k_x))
 
-    # du/dR1 -> alpha * radial * ((RX1 + t) / (RX3 + t)) + beta * radial * skew * ((RX2 + t) / (RX3 + t)) + cx
+    du_dr1_x = (((((dR_dr1 @ points_3D.T).T)[:, 0] + norm_points[:, 2]) - (norm_points[:, 0] *
+                                                                           ((dR_dr1 @ points_3D.T).T)[:, 2])) / (
+                ((dR_dr1 @ points_3D.T).T)[:, 2]) ** 2) * \
+               params["alpha"] * radial_lambda
 
+    du_dr1_y = (((((dR_dr1 @ points_3D.T).T)[:, 1] + norm_points[:, 2]) - (norm_points[:, 1] *
+                                                                           ((dR_dr1 @ points_3D.T).T)[:, 2])) / (
+                ((dR_dr1 @ points_3D.T).T)[:, 2]) ** 2)
 
-    
-    J[::2, 8] = (((dR_dR1 @ points_3D.T).T)) / (X_CAM[:, -1]) * params['alpha'] * radial_lambda
+    du_dr1 = du_dr1_x + du_dr1_y
+    J[::2, 8] = du_dr1
 
-    #print(X_CAM[:, -1])
+    # dv/dR1 -> beta * radial * skew * ((RX2 + t) / (RX3 + t)) + cy
+    dv_dr1_y = (((((dR_dr1 @ points_3D.T).T)[:, 1] + norm_points[:, 2]) - (norm_points[:, 1] *
+                                                                           ((dR_dr1 @ points_3D.T).T)[:, 2])) /
+                (((dR_dr1 @ points_3D.T).T)[:, 2]) ** 2)
 
+    dv_dr1 = params['beta'] * radial_lambda * (1 / np.sin(params['theta'])) * dv_dr1_y
+    J[1::2, 8] = dv_dr1
 
+    # r2
+    dtheta_dr2 = r_v_x[1] / theta
+    dk_dr2 = (1 / theta) * (np.array([0, 1, 0]) - ((r_v_x * r_v_x[1]) / theta ** 2))
+    dk_dr2 = create_skew_rotation_matrix(dk_dr2)
+    dsin_dr2 = cos_theta * dtheta_dr2
+    dcos_dr2 = -sin_theta * dtheta_dr2
 
+    # dk_r2 k**2 -> k @ k -> product rule -> dk_r2 @ k + k @ dk_r2
+    dR_dr2 = ((sin_theta * dk_dr2 + dsin_dr2 * k_x) + ((1 - cos_theta) * (dk_dr2 @ k_x + k_x @ dk_dr2))
+              + ((-dcos_dr2) * k_x @ k_x))
 
+    du_dr2_x = (((((dR_dr2 @ points_3D.T).T)[:, 0] + norm_points[:, 2]) - (norm_points[:, 0] *
+                                                                           ((dR_dr2 @ points_3D.T).T)[:, 2])) /
+                (((dR_dr2 @ points_3D.T).T)[:, 2]) ** 2) * \
+               params["alpha"] * radial_lambda
 
+    du_dr2_y = (((((dR_dr2 @ points_3D.T).T)[:, 1] + norm_points[:, 2]) - (norm_points[:, 1] *
+                                                                           ((dR_dr2 @ points_3D.T).T)[:, 2])) /
+                (((dR_dr2 @ points_3D.T).T)[:, 2]) ** 2)
+    du_dr2 = du_dr2_x + du_dr2_y
+    J[::2, 9] = du_dr2
+
+    # dv/dR2 -> beta * radial * skew * ((RX2 + t) / (RX3 + t)) + cy
+    dv_dr2_y = (((((dR_dr2 @ points_3D.T).T)[:, 1] + norm_points[:, 2]) - (norm_points[:, 1] *
+                                                                           ((dR_dr2 @ points_3D.T).T)[:, 2])) /
+                (((dR_dr2 @ points_3D.T).T)[:, 2]) ** 2)
+
+    dv_dr2 = params['beta'] * radial_lambda * (1 / np.sin(params['theta'])) * dv_dr2_y
+    J[1::2, 9] = dv_dr2
+
+    # r3
+    dtheta_dr3 = r_v_x[2] / theta
+    dk_dr3 = (1 / theta) * (np.array([0, 0, 1]) - ((r_v_x * r_v_x[2]) / theta ** 2))
+    dk_dr3 = create_skew_rotation_matrix(dk_dr3)
+    dsin_dr3 = cos_theta * dtheta_dr3
+    dcos_dr3 = -sin_theta * dtheta_dr3
+
+    # dk_r3 k**2 -> k @ k -> product rule -> dk_r3 @ k + k @ dk_r3
+    dR_dr3 = ((sin_theta * dk_dr3 + dsin_dr3 * k_x) + ((1 - cos_theta) * (dk_dr3 @ k_x + k_x @ dk_dr3))
+              + ((-dcos_dr3) * k_x @ k_x))
+
+    du_dr3_x = (((((dR_dr3 @ points_3D.T).T)[:, 0] + norm_points[:, 2]) - (norm_points[:, 0] *
+                                                                           ((dR_dr3 @ points_3D.T).T)[:, 2])) /
+                (((dR_dr3 @ points_3D.T).T)[:, 2]) ** 2) * \
+               params["alpha"] * radial_lambda
+
+    du_dr3_y = (((((dR_dr3 @ points_3D.T).T)[:, 1] + norm_points[:, 2]) - (norm_points[:, 1] *
+                                                                           ((dR_dr3 @ points_3D.T).T)[:, 2])) /
+                (((dR_dr3 @ points_3D.T).T)[:, 2]) ** 2)
+    du_dr3 = du_dr3_x + du_dr3_y
+    J[::2, 10] = du_dr3
+
+    # dv/dR3 -> beta * radial * skew * ((RX2 + t) / (RX3 + t)) + cy
+    dv_dr3_y = (((((dR_dr3 @ points_3D.T).T)[:, 1] + norm_points[:, 2]) - (norm_points[:, 1] *
+                                                                           ((dR_dr3 @ points_3D.T).T)[:, 2])) /
+                (((dR_dr3 @ points_3D.T).T)[:, 2]) ** 2)
+
+    dv_dr3 = params['beta'] * radial_lambda * (1 / np.sin(params['theta'])) * dv_dr3_y
+    J[1::2, 10] = dv_dr3
 
     return J
-
-"""
 
 
 if __name__ == "__main__":
