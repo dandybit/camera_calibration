@@ -32,10 +32,10 @@ def rodrigues_to_matrix(rvec):
     return R
 
 
-def polinomial_lambda_distortion(coe_1, coe_2, coe_3):
+def polinomial_lambda_distortion(coe_1, coe_2, coe_3, add_one=1):
     def inner(d):
         # d = (x ** 2) + (y ** 2)
-        return (coe_1 * d ** 3) * (coe_2 * d ** 2) + (coe_3 * d) + 1
+        return (coe_1 * (d**3)) + (coe_2 * (d**2)) + (coe_3 * d) + add_one
 
     return inner
 
@@ -83,8 +83,8 @@ def project_points(points_3D, P, K, radial_f):
     d_2 = np.linalg.norm(normalized_points, axis=1) - 1
     radial_lambda = radial_f(d_2)
 
-    # points_2D[:, 0] /= radial_lambda
-    # points_2D[:, 1] /= radial_lambda
+    points_2D[:, 0] *= radial_lambda
+    points_2D[:, 1] *= radial_lambda
 
     return points_2D, radial_lambda, normalized_points
 
@@ -145,10 +145,9 @@ def compute_jacobian(points_2D_y, points_3D, params):
     # project points
     P_x, radial_fx, K_x, R_x, t_x, r_v_x = create_projection_matrix(**params)
     points_2D_x, radial_lambda, norm_points = project_points(points_3D, P_x, K_x, radial_fx)
-    # flat the indices x,y in one row
-    # The jacobian matrix merge x,y values in rows
-    # point(x, y) -> x = 2j-1, y = 2j (in the book, index start in 1 not 0)
-    residuals = (points_2D_y - points_2D_x).ravel()
+
+    skew_u = (np.cos(params['theta']) / np.sin(params['theta']))
+    skew_v = (1 / np.sin(params['theta']))
 
     """
     {'alpha': 1200, 'beta': 800, 'cx': 320, 'cy': 240, 'theta': np.radians(90),
@@ -180,8 +179,8 @@ def compute_jacobian(points_2D_y, points_3D, params):
     J[1::2, 0] = 0
 
     # d_u/d_beta, d_v/d_beta
-    J[::2, 1] = (norm_points[:, 1] * radial_lambda) * (np.cos(params['theta']) / np.sin(params['theta']))
-    J[1::2, 1] = (norm_points[:, 1] * radial_lambda) * (1 / np.sin(params['theta']))
+    J[::2, 1] = 0
+    J[1::2, 1] = (norm_points[:, 1] * radial_lambda) * skew_v
 
     # d_u/d_cx
     J[::2, 2] = 1
@@ -193,56 +192,48 @@ def compute_jacobian(points_2D_y, points_3D, params):
     d_2 = np.linalg.norm(norm_points, axis=1) - 1
 
     # d_u/d_coe_r_1
-    J[::2, 5] = ((((params['alpha'] * norm_points[:, 0]) * (polinomial_lambda_distortion(1, 0, 0)(d_2))))
-                 + ((norm_points[:, 1] * (
-                    np.cos(params['theta']) / np.sin(params['theta'])))) * polinomial_lambda_distortion(1, 0, 0)(
-                d_2))
+    coe_1_d = polinomial_lambda_distortion(1, 0, 0, add_one=0)(d_2)
+    J[::2, 5] = params['alpha'] * norm_points[:, 0] * coe_1_d + params['alpha'] * norm_points[:, 1] * coe_1_d * skew_u
     # d_v/d_coe_r_1
-    J[1::2, 5] = (params['beta'] * norm_points[:, 1] * (polinomial_lambda_distortion(1, 0, 0)(d_2))
-                  * (1 / np.sin(params['theta'])))
+    J[1::2, 5] = (params['beta'] * norm_points[:, 1] * coe_1_d * skew_v)
 
     # d_u/d_coe_r_2
-    J[::2, 6] = ((((params['alpha'] * norm_points[:, 0]) * (polinomial_lambda_distortion(0, 1, 0)(d_2))))
-                 + ((norm_points[:, 1] * (
-                    np.cos(params['theta']) / np.sin(params['theta'])))) * polinomial_lambda_distortion(0, 1, 0)(
-                d_2))
+    coe_2_d = polinomial_lambda_distortion(0, 1, 0, add_one=0)(d_2)
+    J[::2, 6] = params['alpha'] * norm_points[:, 0] * coe_2_d + params['alpha'] * norm_points[:, 1] * coe_2_d * skew_u
     # d_v/d_coe_r_2
-    J[1::2, 6] = (norm_points[:, 1] * params['beta'] * (polinomial_lambda_distortion(0, 1, 0)(d_2))
-                  * (1 / np.sin(params['theta'])))
+    J[1::2, 6] = (params['beta'] * norm_points[:, 1] * coe_2_d * skew_v)
 
     # d_u/d_coe_r_3
-    J[::2, 7] = ((((params['alpha'] * norm_points[:, 0]) * (polinomial_lambda_distortion(0, 0, 1)(d_2))))
-                 + ((norm_points[:, 1] * (
-                    np.cos(params['theta']) / np.sin(params['theta'])))) * polinomial_lambda_distortion(0, 0, 1)(
-                d_2))
+    coe_3_d = polinomial_lambda_distortion(0, 0, 1, add_one=0)(d_2)
+    J[::2, 7] = params['alpha'] * norm_points[:, 0] * coe_3_d + params['alpha'] * norm_points[:, 1] * coe_3_d * skew_u
     # d_v/d_coe_r_3
-    J[1::2, 7] = (norm_points[:, 1] * params['beta'] * (polinomial_lambda_distortion(0, 0, 1)(d_2))
-                  * (1 / np.sin(params['theta'])))
+    J[1::2, 7] = (params['beta'] * norm_points[:, 1] * coe_3_d * skew_v)
+
 
     # the translation vector is based in u = X/Z and v = Y/Z
 
     # du/dt1  alpha * radial * ((RX1 + t1) / (RX3 + t3)) + beta * ((RX2 + t2) / (RX3 + t3)) * skew + cx
     # -> (alpha * radial) / Z_CAM
-    J[::2, 11] = params['alpha'] * radial_lambda / X_CAM[:, -1]
+    #J[::2, 11] = params['alpha'] * radial_lambda / X_CAM[:, -1]
+    J[::2, 11] = params['alpha'] * radial_lambda * (1 / X_CAM[:, -1])
     # du/dt2  alpha * radial * ((RX1 + t1) / (RX3 + t3)) + beta * ((RX2 + t2) / (RX3 + t3)) * skew + cx
     # -> (alpha * radial) / Z_CAM
-    J[::2, 12] = (params['beta'] * radial_lambda * (np.cos(params['theta']) / np.sin(params['theta']))) / X_CAM[:, -1]
+    J[::2, 12] = params['alpha'] * radial_lambda * skew_u * (1 / X_CAM[:, -1])
     # du/dt3  alpha * radial * ((RX1 + t1) / (RX3 + t3)) + beta * ((RX2 + t2) / (RX3 + t3)) * skew + cx
     # -> -X_CAM[:, 0] / Z_CAM^2
-    J[::2, 13] = ((params['alpha'] * radial_lambda * (-X_CAM[:, 0]) / (X_CAM[:, -1] ** 2))
-                  + (params['beta'] * radial_lambda * ((np.cos(params['theta']) / np.sin(params['theta'])))
-                     * (-X_CAM[:, 1]) / (X_CAM[:, -1] ** 2)))
+    J[::2, 13] = params['alpha'] * radial_lambda * (-X_CAM[:, 0] / (X_CAM[:, -1]**2)) + \
+                 params['alpha'] * radial_lambda * skew_u * (-X_CAM[:, 1] / (X_CAM[:, -1]**2))
 
     # dv/dt1  beta * ((RX2 + t2) / (RX3 + t3)) * skew + cy
     # -> 0
     J[1::2, 11] = 0
     # dv/dt2  beta * ((RX2 + t2) / (RX3 + t3)) * skew + cy
     # -> (alpha * radial * skew) / Z_CAM
-    J[1::2, 12] = (params['beta'] * radial_lambda * (1 / np.sin(params['theta']))) / X_CAM[:, -1]
+    J[1::2, 12] = (params['beta'] * radial_lambda * skew_v) * (1 / X_CAM[:, -1])
     # dv/dt3  beta * ((RX2 + t2) / (RX3 + t3)) * skew + cy
     # -> -X_CAM[:, 0] / Z_CAM^2
-    J[1::2, 13] = (
-                (params['beta'] * radial_lambda * (1 / np.sin(params['theta']))) * (-X_CAM[:, 1]) / (X_CAM[:, -1] ** 2))
+    J[1::2, 13] = (params['beta'] * radial_lambda * skew_v) * (-X_CAM[:, 1] / (X_CAM[:, -1]**2))
+
 
     # the rotation vector is based in u = X/Z and v = Y/Z
 
@@ -306,6 +297,7 @@ def compute_jacobian(points_2D_y, points_3D, params):
     dv_dr1 = params['beta'] * radial_lambda * (1 / np.sin(params['theta'])) * dv_dr1_y
     J[1::2, 8] = dv_dr1
 
+    """
     # r2
     dtheta_dr2 = r_v_x[1] / theta
     dk_dr2 = (1 / theta) * (np.array([0, 1, 0]) - ((r_v_x * r_v_x[1]) / theta ** 2))
@@ -366,18 +358,90 @@ def compute_jacobian(points_2D_y, points_3D, params):
     dv_dr3 = params['beta'] * radial_lambda * (1 / np.sin(params['theta'])) * dv_dr3_y
     J[1::2, 10] = dv_dr3
 
+    """
     return J
 
+def calculate_residuals(true_g, pred):
+    return (pred - true_g).ravel()
 
-if __name__ == "__main__":
+def update_params(params, delta):
+    """
+       {'alpha': 1200, 'beta': 800, 'cx': 320, 'cy': 240, 'theta': np.radians(90),
+        'coe_r_1': 0.005, 'coe_r_2': 0.01, 'coe_r_3': 0.1,
+        'r_v_1': 1, 'r_v_2': 1, 'r_v_3': 1,
+        't_1': 0, 't_2': 0, 't_3': 3}
+    """
+    params['alpha'] += delta[0]
+    params['beta'] += delta[1]
+    params['cx'] += delta[2]
+    params['cy'] += delta[3]
+    #theta
+    params['coe_r_1'] += delta[5]
+    params['coe_r_2'] += delta[6]
+    params['coe_r_3'] += delta[7]
+    params['r_v_1'] += delta[8]
+    params['r_v_2'] += delta[9]
+    params['r_v_3'] += delta[10]
+    params['t_1'] += delta[11]
+    params['t_2'] += delta[12]
+    params['t_3'] += delta[13]
+
+    return params
+
+def levenberg_marquardt(params_init, points_3D, points_2D, iters=100, mu=1e-3, tol=1e-6):
+
+    nu = 2
+    for i in range(iters):
+        P_x, radial_fx, K_x, R_x, t_x, r_v_x = create_projection_matrix(**params_init)
+        # pred points_2D
+        points_2D_x, radial_lambda_x, _ = project_points(points_3D, P_x, K_x, radial_fx)
+        residuals = calculate_residuals(points_2D[:, :-1], points_2D_x[:, :-1])
+        chi2 = 0.5 * np.dot(residuals, residuals)
+
+        J = compute_jacobian(points_2D_x, points_3D, params_init)
+
+        J_T_J = J.T @ J
+        # hessian compensation
+        H = J_T_J + (mu * np.diag(np.diag(J_T_J)))
+
+        G = J.T @ residuals
+
+        delta_x = -np.linalg.pinv(H) @ G
+
+        params_init = update_params(params_init, delta_x)
+
+        print(f"iter: {i}, mu: {mu}")
+
+        P_x, radial_fx, K_x, R_x, t_x, r_v_x = create_projection_matrix(**params_init)
+        # pred points_2D
+        points_2D_x, radial_lambda_x, _ = project_points(points_3D, P_x, K_x, radial_fx)
+        residuals = calculate_residuals(points_2D[:, :-1], points_2D_x[:, :-1])
+        chi2_new = 0.5 * np.dot(residuals, residuals)
+        rho = (chi2 - chi2_new) / (0.5 * delta_x.T @ (mu * delta_x - G))
+        if rho > 0:
+            mu *= max(1 / 3, 1 - (2 * rho - 1) ** 3)
+            nu = 2
+        else:
+            mu *= nu
+            nu *= 2
+
+    return params_init
+
+def main():
     num_points = 50
     points_3D = generate_3d_points(num_points)
 
+    """
     # true ground
     parameters_y = {'alpha': 1200, 'beta': 800, 'cx': 320, 'cy': 240, 'theta': np.radians(90),
-                    'coe_r_1': 0.005, 'coe_r_2': 0.01, 'coe_r_3': 0.1,
+                    'coe_r_1': 0.5, 'coe_r_2': 0.01, 'coe_r_3': 0.001,
                     'r_v_1': 1, 'r_v_2': 1, 'r_v_3': 1,
-                    't_1': 0, 't_2': 0, 't_3': 3}
+                    't_1': 1, 't_2': -1, 't_3': 3}
+    """
+    parameters_y = {'alpha': 1200, 'beta': 800, 'cx': 320, 'cy': 240, 'theta': np.radians(90),
+                    'coe_r_1': 0.5, 'coe_r_2': 0.01, 'coe_r_3': 0.001,
+                    'r_v_1': 0.5, 'r_v_2': 0.0, 'r_v_3': 0,
+                    't_1': 0.9, 't_2': 0.23, 't_3': 0.77}
 
     P_y, radial_fy, K_y, R_x, t_x, r_v_x = create_projection_matrix(**parameters_y)
 
@@ -386,17 +450,22 @@ if __name__ == "__main__":
     # points_2D_y = add_noise(points_2D_y, sigma=0.5)
     P_y = build_P_matrix(points_2D_y, points_3D)
 
+    """
     # initial point to estimation
-    parameters_x = {'alpha': 1200, 'beta': 800, 'cx': 320, 'cy': 240, 'theta': np.radians(90),
-                    'coe_r_1': 0.005, 'coe_r_2': 0.01, 'coe_r_3': 0.1,
-                    'r_v_1': 1, 'r_v_2': 1, 'r_v_3': 1,
-                    't_1': 0, 't_2': 0, 't_3': 3}
+    parameters_x = {'alpha': 600, 'beta': 450, 'cx': 100, 'cy': 120, 'theta': np.radians(90),
+                    'coe_r_1': 0.5, 'coe_r_2': 0.001, 'coe_r_3': 1.1,
+                    'r_v_1': 1.6, 'r_v_2': 5.7, 'r_v_3': 3.2,
+                    't_1': 5, 't_2': -5, 't_3': 6}
+    """
+    parameters_x = {'alpha': 600, 'beta': 450, 'cx': 100, 'cy': 120, 'theta': np.radians(90),
+                    'coe_r_1': 0.5, 'coe_r_2': 0.001, 'coe_r_3': 1.1,
+                    'r_v_1': 0.1, 'r_v_2': 0.0, 'r_v_3': 0.0,
+                    't_1': 0.5, 't_2': 0.5, 't_3': 0.5}
 
-    P_x, radial_fx, K_x, R_x, t_x, r_v_x = create_projection_matrix(**parameters_x)
+    params_estimate = levenberg_marquardt(parameters_x, points_3D, points_2D_y)
+    print(params_estimate)
+    print(parameters_y)
 
-    # pred points_2D
-    points_2D_x, radial_lambda_x, _ = project_points(points_3D, P_x, K_x, radial_fx)
-    # points_2D_x = add_noise(points_2D_x, sigma=0.5)
-    P_x = build_P_matrix(points_2D_x, points_3D)
 
-    compute_jacobian(points_2D_y, points_3D, parameters_x)
+if __name__ == "__main__":
+    main()

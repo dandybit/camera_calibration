@@ -4,6 +4,7 @@ This code is an implementation of Exercise 1.13 from the book "Computer Vision: 
 
 import numpy as np
 
+
 def generate_3d_points(num_points):
     # generate some 3D random points.
     X = np.random.uniform(-1, 1, num_points)
@@ -15,6 +16,7 @@ def generate_3d_points(num_points):
     points_3D = np.vstack((X, Y, Z)).T
 
     return points_3D
+
 
 def create_projection_matrix():
     # intrinsic parameters
@@ -31,9 +33,9 @@ def create_projection_matrix():
     t = np.array([[0], [0], [-4]])
 
     K = np.array([
-        [α,  α * (np.cos(θ) / np.sin(θ)), cx],
+        [α, α * (np.cos(θ) / np.sin(θ)), cx],
         [0, β / np.sin(θ), cy],
-        [0,  0,  1]
+        [0, 0, 1]
     ])
 
     RT = np.hstack((R, t))
@@ -42,6 +44,7 @@ def create_projection_matrix():
     parameters = {'α': α, 'β': β, 'cx': cx, 'cy': cy, 'θ': θ, 'R': R, 't': t}
 
     return P, parameters
+
 
 def project_points(points_3D, P):
     # number of points
@@ -60,6 +63,7 @@ def project_points(points_3D, P):
     points_2D = points_2D_hom[:, :2] / points_2D_hom[:, 2, np.newaxis]
 
     return points_2D
+
 
 def add_noise(points_2D, sigma=1.0):
     noise = np.random.normal(0, sigma, points_2D.shape)
@@ -83,21 +87,21 @@ if __name__ == "__main__":
     for idx in range(points_3D.shape[0]):
         # for x points
         p_final.append([
-                points_3D[idx][0], points_3D[idx][1], points_3D[idx][2], 1,
-                0, 0, 0, 0,
-                -points_2D[idx][0] * points_3D[idx][0],
-                -points_2D[idx][0] * points_3D[idx][1],
-                -points_2D[idx][0] * (points_3D[idx][2]), -points_2D[idx][0]
-            ])
+            points_3D[idx][0], points_3D[idx][1], points_3D[idx][2], 1,
+            0, 0, 0, 0,
+            -points_2D[idx][0] * points_3D[idx][0],
+            -points_2D[idx][0] * points_3D[idx][1],
+            -points_2D[idx][0] * (points_3D[idx][2]), -points_2D[idx][0]
+        ])
 
         # for y points
         p_final.append([
-                0, 0, 0, 0,
-                points_3D[idx][0], points_3D[idx][1], (points_3D[idx][2]), 1,
-                -points_2D[idx][1] * points_3D[idx][0],
-                -points_2D[idx][1] * points_3D[idx][1],
-                -points_2D[idx][1] * (points_3D[idx][2]), -points_2D[idx][1]
-            ])
+            0, 0, 0, 0,
+            points_3D[idx][0], points_3D[idx][1], (points_3D[idx][2]), 1,
+            -points_2D[idx][1] * points_3D[idx][0],
+            -points_2D[idx][1] * points_3D[idx][1],
+            -points_2D[idx][1] * (points_3D[idx][2]), -points_2D[idx][1]
+        ])
 
     P = np.array(p_final)
 
@@ -127,17 +131,18 @@ if __name__ == "__main__":
 
     # a1 * a3 = x0 * (r3^T)^2
     # (r3^T)² = 1 (dot product with angle 0)
-    cx = p**2 * (np.dot(a1, a3)) #(pa1 * pa3)
-    cy = p**2 * (np.dot(a2, a3))
+    cx = p ** 2 * (np.dot(a1, a3))  # (pa1 * pa3)
+    cy = p ** 2 * (np.dot(a2, a3))
 
     # radiants
-    θ_rad = (np.dot(np.cross(a1, a3), np.cross(a2, a3))) / (np.linalg.norm(np.cross(a1, a3) * np.linalg.norm(np.cross(a2, a3))))
+    θ_rad = (np.dot(np.cross(a1, a3), np.cross(a2, a3))) / (
+        np.linalg.norm(np.cross(a1, a3) * np.linalg.norm(np.cross(a2, a3))))
     θ_rad = np.arccos(-θ_rad)
 
     α = np.linalg.norm(np.cross(p * a1, p * a3)) * np.sin(θ_rad)
     β = np.linalg.norm(np.cross(p * a2, p * a3)) * np.sin(θ_rad)
 
-    r3 = p * a3 # a3 -> r3^T
+    r3 = p * a3  # a3 -> r3^T
     r1 = (1 / np.linalg.norm(np.cross(a2, a3))) * np.cross(a2, a3)
     r2 = np.cross(r3, r1)
 
@@ -170,19 +175,11 @@ if __name__ == "__main__":
     print("*" * 100)
     print("ESTIMATED PARAMETERS MATRIX:")
     print(P_final)
-    print({'α': α, 'β': β, 'cx': cx, 'cy': cy, 'θ_rad': θ_rad, 'R': estimated_rotation_matrix, 't': estimated_translation_matrix})
+    print({'α': α, 'β': β, 'cx': cx, 'cy': cy, 'θ_rad': θ_rad, 'R': estimated_rotation_matrix,
+           't': estimated_translation_matrix})
     print("*" * 100)
     print("CHECKING POINTS")
 
     estimated_points = project_points(points_3D, P_final)
     for idx in range(points_2D.shape[0]):
         print(f"ORIGINAL_POINT: {points_2D[idx]} ESTIMATED_POINT{estimated_points[idx]}")
-
-
-
-
-
-
-
-
-
