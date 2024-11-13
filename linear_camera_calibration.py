@@ -73,7 +73,7 @@ def add_noise(points_2D, sigma=1.0):
 
 
 if __name__ == "__main__":
-    num_points = 50
+    num_points = 100
     points_3D = generate_3d_points(num_points)
 
     P_i, parameters = create_projection_matrix()
